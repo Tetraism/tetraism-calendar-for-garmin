@@ -1,0 +1,3 @@
+{
+    "monkeyC.developerKeyPath": "${workspaceFolder}/developer_key.der"
+}
