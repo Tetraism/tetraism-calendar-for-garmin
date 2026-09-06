@@ -40,6 +40,13 @@ class tetraism_calendarView extends WatchUi.View {
     var _showGregorian as Boolean = false;
     var _timer as Timer.Timer?;
 
+    // Month currently being *viewed* (may differ from today's month once the
+    // user has paged with UP/DOWN or a swipe). null = not set yet, use today.
+    var _gYear as Number?;
+    var _gMonth as Number?;
+    var _tYear as Number?;
+    var _tMonth as Number?;   // -1 = the block of extra/bonus days
+
     function initialize() {
         View.initialize();
         var allowGregorian = Properties.getValue("AllowGregorianView");
@@ -75,6 +82,71 @@ class tetraism_calendarView extends WatchUi.View {
             _showGregorian = !_showGregorian;
             WatchUi.requestUpdate();
         }
+    }
+
+    // ─── month navigation (UP/DOWN buttons, or swipe up/down on touch-only
+    // watches — both map to onPreviousPage/onNextPage in the delegate) ──
+
+    function ensureGregView() as Void {
+        if (_gMonth == null) {
+            var info = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+            _gMonth = info.month;
+            _gYear = info.year;
+        }
+    }
+
+    function ensureTetraView() as Void {
+        if (_tMonth == null) {
+            var dateInfo = getTetraDate();
+            _tMonth = dateInfo[1];
+            _tYear  = dateInfo[2];
+        }
+    }
+
+    function previousMonth() as Void {
+        if (_showGregorian) {
+            ensureGregView();
+            if (_gMonth == 1) {
+                _gMonth = 12;
+                _gYear = (_gYear as Number) - 1;
+            } else {
+                _gMonth = (_gMonth as Number) - 1;
+            }
+        } else {
+            ensureTetraView();
+            if (_tMonth == -1) {
+                _tMonth = 14;
+            } else if (_tMonth == 0) {
+                _tYear = (_tYear as Number) - 1;
+                _tMonth = -1;
+            } else {
+                _tMonth = (_tMonth as Number) - 1;
+            }
+        }
+        WatchUi.requestUpdate();
+    }
+
+    function nextMonth() as Void {
+        if (_showGregorian) {
+            ensureGregView();
+            if (_gMonth == 12) {
+                _gMonth = 1;
+                _gYear = (_gYear as Number) + 1;
+            } else {
+                _gMonth = (_gMonth as Number) + 1;
+            }
+        } else {
+            ensureTetraView();
+            if (_tMonth == 14) {
+                _tMonth = -1;
+            } else if (_tMonth == -1) {
+                _tYear = (_tYear as Number) + 1;
+                _tMonth = 0;
+            } else {
+                _tMonth = (_tMonth as Number) + 1;
+            }
+        }
+        WatchUi.requestUpdate();
     }
 
     // days_from_civil (Howard Hinnant) — absolute day number, only ever used
@@ -192,10 +264,16 @@ class tetraism_calendarView extends WatchUi.View {
     }
 
     function drawTetraCalendar(dc as Dc, width as Number, height as Number, cx as Number, cy as Number) as Void {
-        var dateInfo = getTetraDate();
-        var day      = dateInfo[0];
-        var monthIdx = dateInfo[1];
-        var year     = dateInfo[2];
+        ensureTetraView();
+        var monthIdx = _tMonth as Number;
+        var year     = _tYear as Number;
+
+        // What day it actually is right now — independent of what's being
+        // *viewed* — so we only ever highlight a cell when it's really today.
+        var actual          = getTetraDate();
+        var actualDay       = actual[0];
+        var actualMonthIdx  = actual[1];
+        var actualYear      = actual[2];
 
         var timeInfo = getTetraTime();
         var timeStr  = Lang.format("$1$:$2$:$3$", [
@@ -207,14 +285,9 @@ class tetraism_calendarView extends WatchUi.View {
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         if (monthIdx == -1) {
-            // one of the year-end bonus days — no grid, just the day's name.
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy, Graphics.FONT_NUMBER_MEDIUM, EXTRA_NAMES[day],
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, (height * 0.72).toNumber(), Graphics.FONT_TINY,
-                        Lang.format("Year $1$", [year]),
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            // the year-end bonus days for the viewed year.
+            var highlightIdx = (actualMonthIdx == -1 && actualYear == year) ? actualDay : -1;
+            drawExtraDays(dc, width, height, cx, cy, year, highlightIdx);
             return;
         }
 
@@ -222,6 +295,8 @@ class tetraism_calendarView extends WatchUi.View {
         dc.drawText(cx, (height * 0.26).toNumber(), Graphics.FONT_TINY,
                     Lang.format("$1$ - Year $2$", [TETRA_MONTHS[monthIdx], year]),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        var highlightDay = (monthIdx == actualMonthIdx && year == actualYear) ? actualDay : -1;
 
         // 24-day month = 2 weeks of 12 days. Each week is drawn as 2 rows of 6
         // (not 1 row of 12) so the block reads clearly on a small round screen.
@@ -234,8 +309,37 @@ class tetraism_calendarView extends WatchUi.View {
         var week1Y = (height * 0.40).toNumber();
         var week2Y = week1Y + 2 * cellH + weekGap;
 
-        drawTetraWeek(dc, startX, week1Y, cellW, cellH, 1, day);
-        drawTetraWeek(dc, startX, week2Y, cellW, cellH, 13, day);
+        drawTetraWeek(dc, startX, week1Y, cellW, cellH, 1, highlightDay);
+        drawTetraWeek(dc, startX, week2Y, cellW, cellH, 13, highlightDay);
+    }
+
+    // Draws the list of year-end bonus days (5, or 6 in a leap year) for the
+    // given tetra year. `highlightIdx` is the actual current extra day
+    // (0-based) when the viewed year is really the current year, else -1.
+    function drawExtraDays(dc as Dc, width as Number, height as Number, cx as Number, cy as Number,
+                            year as Number, highlightIdx as Number) as Void {
+        var count = isTetraLeapYear(year) ? 6 : 5;
+
+        dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, (height * 0.26).toNumber(), Graphics.FONT_TINY,
+                    Lang.format("Extra Days - Year $1$", [year]),
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        var rowH = (height * 0.09).toNumber();
+        var startY = (height * 0.40).toNumber();
+
+        for (var i = 0; i < count; i++) {
+            var y = startY + i * rowH;
+            if (i == highlightIdx) {
+                dc.setColor(Graphics.COLOR_DK_GREEN, Graphics.COLOR_TRANSPARENT);
+                dc.fillRectangle((width * 0.20).toNumber(), y, (width * 0.60).toNumber(), rowH - 2);
+                dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            } else {
+                dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            }
+            dc.drawText(cx, y + rowH / 2, Graphics.FONT_XTINY, EXTRA_NAMES[i],
+                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
     }
 
     // Draws one 12-day week as 2 rows of 6, starting at day number `firstDay`
@@ -269,15 +373,24 @@ class tetraism_calendarView extends WatchUi.View {
     }
 
     function drawGregorianCalendar(dc as Dc, width as Number, height as Number, cx as Number, cy as Number) as Void {
-        var infoShort  = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
-        var infoMedium = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
-        var today  = infoShort.day;
-        var month  = infoShort.month;
-        var year   = infoShort.year;
+        ensureGregView();
+        var month = _gMonth as Number;
+        var year  = _gYear as Number;
+
+        // What day it actually is right now — independent of what's being
+        // *viewed* — so we only ever highlight a cell when it's really today.
+        var infoShort = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+        var isCurrentMonth = (infoShort.month == month && infoShort.year == year);
+        var today = infoShort.day;
+
+        var monthLabel = Gregorian.info(
+            Gregorian.moment({:year => year, :month => month, :day => 1, :hour => 0}),
+            Time.FORMAT_MEDIUM
+        ).month;
 
         dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, (height * 0.24).toNumber(), Graphics.FONT_SMALL,
-                    Lang.format("$1$ $2$", [infoMedium.month, year]),
+                    Lang.format("$1$ $2$", [monthLabel, year]),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var firstWeekday = Gregorian.info(
@@ -309,7 +422,7 @@ class tetraism_calendarView extends WatchUi.View {
             var x = startX + col * cellW;
             var y = startY + row * cellH;
 
-            if (d == today) {
+            if (isCurrentMonth && d == today) {
                 dc.setColor(Graphics.COLOR_DK_GREEN, Graphics.COLOR_TRANSPARENT);
                 dc.fillRectangle(x + 1, y + 1, cellW - 2, cellH - 2);
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);

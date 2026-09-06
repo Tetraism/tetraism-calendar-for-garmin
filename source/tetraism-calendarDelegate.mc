@@ -15,4 +15,18 @@ class tetraism_calendarDelegate extends WatchUi.BehaviorDelegate {
         _view.toggleCalendar();
         return true;
     }
+
+    // BehaviorDelegate maps this to the physical UP button *and* to an
+    // upward swipe on touchscreens — including touch-only watches that
+    // have no UP/DOWN buttons at all. No extra swipe code needed.
+    function onPreviousPage() as Boolean {
+        _view.previousMonth();
+        return true;
+    }
+
+    // Same mapping as above, but for DOWN / a downward swipe.
+    function onNextPage() as Boolean {
+        _view.nextMonth();
+        return true;
+    }
 }
