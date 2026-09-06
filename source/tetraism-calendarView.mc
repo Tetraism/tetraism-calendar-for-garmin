@@ -227,19 +227,6 @@ class tetraism_calendarView extends WatchUi.View {
         return days[m - 1];
     }
 
-    function formatRealTime() as String {
-        var clockTime = System.getClockTime();
-        var settings  = System.getDeviceSettings();
-        var hour = clockTime.hour;
-        var suffix = "";
-        if (!settings.is24Hour) {
-            suffix = (hour >= 12) ? " PM" : " AM";
-            hour = hour % 12;
-            if (hour == 0) { hour = 12; }
-        }
-        return Lang.format("$1$:$2$$3$", [hour, clockTime.min.format("%02d"), suffix]);
-    }
-
     // ─── drawing ──────────────────────────────────────────────────────
 
     function onUpdate(dc as Dc) as Void {
@@ -252,10 +239,7 @@ class tetraism_calendarView extends WatchUi.View {
         dc.clear();
 
         if (_showGregorian) {
-            // Regular calendar mode — the clock people actually read: real time.
-            dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, (height * 0.10).toNumber(), Graphics.FONT_MEDIUM, formatRealTime(),
-                        Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            // Regular calendar mode.
             drawGregorianCalendar(dc, width, height, cx, cy);
         } else {
             // Tetristic mode — decimal time only, drawn inside drawTetraCalendar().
@@ -304,7 +288,7 @@ class tetraism_calendarView extends WatchUi.View {
         var gridW = (width * 0.70).toNumber();
         var cellW = gridW / cols;
         var cellH = cellW;
-        var weekGap = (cellH * 0.5).toNumber();
+        var weekGap = (cellH * 0.15).toNumber();
         var startX = cx - gridW / 2;
         var week1Y = (height * 0.40).toNumber();
         var week2Y = week1Y + 2 * cellH + weekGap;
@@ -389,7 +373,7 @@ class tetraism_calendarView extends WatchUi.View {
         ).month;
 
         dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, (height * 0.24).toNumber(), Graphics.FONT_SMALL,
+        dc.drawText(cx, (height * 0.12).toNumber(), Graphics.FONT_SMALL,
                     Lang.format("$1$ $2$", [monthLabel, year]),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
@@ -406,7 +390,7 @@ class tetraism_calendarView extends WatchUi.View {
         var cellW = gridW / cols;
         var cellH = gridH / rows;
         var startX = cx - gridW / 2;
-        var startY = (height * 0.32).toNumber();
+        var startY = (height * 0.34).toNumber();
 
         var dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
         dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
