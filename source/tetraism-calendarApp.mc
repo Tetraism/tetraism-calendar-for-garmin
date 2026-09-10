@@ -24,7 +24,7 @@ class tetraism_calendarApp extends Application.AppBase {
     // to leave unconditional. Older devices never get this function at
     // all, so getInitialView() above remains their only entry point.
     (:glance)
-    function getGlanceView() as Lang.Array<WatchUi.GlanceView> or Null {
+    function getGlanceView() as [WatchUi.GlanceView] or [WatchUi.GlanceView, WatchUi.GlanceViewDelegate] or Null {
         return [ new tetraism_calendarGlanceView() ];
     }
 
