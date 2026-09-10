@@ -19,6 +19,15 @@ class tetraism_calendarApp extends Application.AppBase {
         return [ view, new tetraism_calendarDelegate(view) ];
     }
 
+    // Only compiled for devices whose API level has WatchUi.GlanceView
+    // (3.1.0+) — see tetraism-calendarGlanceView.mc for why this is safe
+    // to leave unconditional. Older devices never get this function at
+    // all, so getInitialView() above remains their only entry point.
+    (:glance)
+    function getGlanceView() as [WatchUi.GlanceView] or Null {
+        return [ new tetraism_calendarGlanceView() ];
+    }
+
 }
 
 function getApp() as tetraism_calendarApp {

@@ -9,33 +9,10 @@ import Toybox.Application.Properties;
 
 class tetraism_calendarView extends WatchUi.View {
 
-    // ═══════════════════════════════════════════════════════════════
-    // Tetraism calendar system — from Tetraism/calendar (logic.json)
-    // and the reference implementation in Tetraism/tetrasaim-clock-for-garmin.
-    // 15 months x 24 days = 360 days + 5 bonus days (6 in a leap year, "Telade").
-    // Epoch: 2026-01-13 (Gregorian) = 1/1/0 (Tetraism).
-    // ═══════════════════════════════════════════════════════════════
-
-    // Latin names (logic.json's "manesiNames") — the Hebrew names from the same file
-    // render as tofu on most watch fonts, which don't carry Hebrew glyphs.
-    const TETRA_MONTHS = [
-        "A Manesis", "B Manesis", "C Manesis", "D Manesis",
-        "E Manesis", "F Manesis", "G Manesis", "H Manesis",
-        "I Manesis", "J Manesis", "K Manesis", "L Manesis",
-        "M Manesis", "N Manesis", "O Manesis"
-    ];
-
-    const EXTRA_NAMES = ["Extra 1", "Extra 2", "Extra 3", "Extra 4", "Extra 5", "Telade"];
-
-    const TETRA_EPOCH_G_DAY   = 13;
-    const TETRA_EPOCH_G_MONTH = 1;
-    const TETRA_EPOCH_G_YEAR  = 2026;
-    const TETRA_EPOCH_T_YEAR  = 0;
-    const TETRA_YEAR_OFFSET   = TETRA_EPOCH_T_YEAR - TETRA_EPOCH_G_YEAR;
-
-    const TETRA_UNITS_PER_DAY = 248832; // 12 * 144 * 144
-    const TETRA_UNITS_PER_HOUR = 20736; // 144 * 144
-    const TETRA_TIME_OFFSET   = 64886;
+    // Calendar math (TETRA_MONTHS, EXTRA_NAMES, getTetraDate/getTetraTime
+    // equivalents, ...) now lives in the shared TetraCalendar module — see
+    // tetraism-calendarModel.mc — so the glance view can use the exact same
+    // logic without duplicating it.
 
     var _showGregorian as Boolean = false;
     var _timer as Timer.Timer?;
@@ -49,10 +26,7 @@ class tetraism_calendarView extends WatchUi.View {
 
     function initialize() {
         View.initialize();
-        var allowGregorian = Properties.getValue("AllowGregorianView");
-        var defaultGregorian = Properties.getValue("DefaultGregorian");
-        _showGregorian = (allowGregorian == null || allowGregorian)
-                       && (defaultGregorian != null && defaultGregorian);
+        _showGregorian = TetraCalendar.useGregorianDefault();
     }
 
     function onLayout(dc as Dc) as Void {
@@ -97,7 +71,7 @@ class tetraism_calendarView extends WatchUi.View {
 
     function ensureTetraView() as Void {
         if (_tMonth == null) {
-            var dateInfo = getTetraDate();
+            var dateInfo = TetraCalendar.getDate();
             _tMonth = dateInfo[1];
             _tYear  = dateInfo[2];
         }
@@ -149,79 +123,9 @@ class tetraism_calendarView extends WatchUi.View {
         WatchUi.requestUpdate();
     }
 
-    // days_from_civil (Howard Hinnant) — absolute day number, only ever used
-    // as a difference between two calls, so no epoch offset is needed.
-    function getAbsoluteDays(d as Number, m as Number, y as Number) as Number {
-        var yy = y;
-        if (m <= 2) { yy -= 1; }
-        var era = (yy >= 0) ? (yy / 400) : ((yy - 399) / 400);
-        var yoe = yy - era * 400;
-        var mm  = (m > 2) ? (m - 3) : (m + 9);
-        var doy = (153 * mm + 2) / 5 + d - 1;
-        var doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        return era * 146097 + doe;
-    }
-
-    function isLeapGreg(y as Number) as Boolean {
-        return (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0);
-    }
-
-    function isTetraLeapYear(tetraYear as Number) as Boolean {
-        return isLeapGreg(tetraYear - TETRA_YEAR_OFFSET);
-    }
-
-    // Returns [dayOfMonth 1-24, monthIndex 0-14, tetraYear] for regular days,
-    // or [extraIndex 0-4 (0-5 in a leap year), -1, tetraYear] for the bonus days.
-    function getTetraDate() as Array {
-        var info   = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
-        var todayAbs = getAbsoluteDays(info.day, info.month, info.year);
-        var syncAbs  = getAbsoluteDays(TETRA_EPOCH_G_DAY, TETRA_EPOCH_G_MONTH, TETRA_EPOCH_G_YEAR);
-
-        var remainingDays = todayAbs - syncAbs;
-        var year = TETRA_EPOCH_T_YEAR;
-
-        if (remainingDays >= 0) {
-            while (true) {
-                var daysInYear = isTetraLeapYear(year) ? 366 : 365;
-                if (remainingDays >= daysInYear) {
-                    remainingDays -= daysInYear;
-                    year++;
-                } else {
-                    break;
-                }
-            }
-        } else {
-            while (remainingDays < 0) {
-                year--;
-                remainingDays += isTetraLeapYear(year) ? 366 : 365;
-            }
-        }
-
-        if (remainingDays < 360) {
-            return [(remainingDays % 24) + 1, remainingDays / 24, year];
-        }
-        return [remainingDays - 360, -1, year];
-    }
-
-    function getTetraTime() as Array {
-        var clockTime = System.getClockTime();
-        var totalSec  = clockTime.hour.toDouble() * 3600.0
-                      + clockTime.min.toDouble()  * 60.0
-                      + clockTime.sec.toDouble();
-
-        var units = totalSec * TETRA_UNITS_PER_DAY.toDouble() / 86400.0 - TETRA_TIME_OFFSET.toDouble();
-        if (units < 0) { units += TETRA_UNITS_PER_DAY.toDouble(); }
-
-        var h = (units / TETRA_UNITS_PER_HOUR.toDouble()).toNumber();
-        var rem = units - h.toDouble() * TETRA_UNITS_PER_HOUR.toDouble();
-        var mn = (rem / 144.0).toNumber();
-        var s  = (rem - mn.toDouble() * 144.0).toNumber();
-        return [h, mn, s];
-    }
-
     function daysInMonthGreg(m as Number, y as Number) as Number {
         var days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-        if (m == 2 && isLeapGreg(y)) {
+        if (m == 2 && TetraCalendar.isLeapGreg(y)) {
             return 29;
         }
         return days[m - 1];
@@ -254,12 +158,12 @@ class tetraism_calendarView extends WatchUi.View {
 
         // What day it actually is right now — independent of what's being
         // *viewed* — so we only ever highlight a cell when it's really today.
-        var actual          = getTetraDate();
+        var actual          = TetraCalendar.getDate();
         var actualDay       = actual[0];
         var actualMonthIdx  = actual[1];
         var actualYear      = actual[2];
 
-        var timeInfo = getTetraTime();
+        var timeInfo = TetraCalendar.getTime();
         var timeStr  = Lang.format("$1$:$2$:$3$", [
             timeInfo[0], timeInfo[1].format("%02d"), timeInfo[2].format("%02d")
         ]);
@@ -277,7 +181,7 @@ class tetraism_calendarView extends WatchUi.View {
 
         dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, (height * 0.26).toNumber(), Graphics.FONT_TINY,
-                    Lang.format("$1$ - Year $2$", [TETRA_MONTHS[monthIdx], year]),
+                    Lang.format("$1$ - Year $2$", [TetraCalendar.MONTHS[monthIdx], year]),
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
 
         var highlightDay = (monthIdx == actualMonthIdx && year == actualYear) ? actualDay : -1;
@@ -302,7 +206,7 @@ class tetraism_calendarView extends WatchUi.View {
     // (0-based) when the viewed year is really the current year, else -1.
     function drawExtraDays(dc as Dc, width as Number, height as Number, cx as Number, cy as Number,
                             year as Number, highlightIdx as Number) as Void {
-        var count = isTetraLeapYear(year) ? 6 : 5;
+        var count = TetraCalendar.isLeapYear(year) ? 6 : 5;
 
         dc.setColor(Graphics.COLOR_YELLOW, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, (height * 0.26).toNumber(), Graphics.FONT_TINY,
@@ -321,7 +225,7 @@ class tetraism_calendarView extends WatchUi.View {
             } else {
                 dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
             }
-            dc.drawText(cx, y + rowH / 2, Graphics.FONT_XTINY, EXTRA_NAMES[i],
+            dc.drawText(cx, y + rowH / 2, Graphics.FONT_XTINY, TetraCalendar.EXTRA_NAMES[i],
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
     }
