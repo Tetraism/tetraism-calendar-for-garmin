@@ -135,10 +135,10 @@ class tetraism_calendarView extends WatchUi.View {
     // normal outlined cell" (see the callers).
     function cellStyle(monthIdx as Number, day as Number) as Array {
         if (getHolidays().isNamedHoliday(monthIdx, day)) {
-            return [Graphics.COLOR_DK_RED, Graphics.COLOR_WHITE];
+            return [Graphics.COLOR_YELLOW, Graphics.COLOR_BLACK];
         }
         if (getHolidays().isWeeklyOff(monthIdx, day)) {
-            return [Graphics.COLOR_ORANGE, Graphics.COLOR_BLACK];
+            return [Graphics.COLOR_DK_RED, Graphics.COLOR_WHITE];
         }
         return [null, Graphics.COLOR_LT_GRAY];
     }
