@@ -33,7 +33,30 @@ class Holidays {
     // successful sync populates Storage with the real, possibly-updated list.
     const DEFAULT_WEEKLY_HOLIDAYS = [6, 12];
 
+    // In-memory copy of Storage's DATA_KEY, loaded once instead of on every
+    // single cell of every redraw. Storage.getValue() reads persisted flash
+    // storage, not memory - calling it 2-3x per day cell (up to ~90x per
+    // screen, every second via the clock timer, and on every page turn) was
+    // the actual cause of sluggish scrolling/paging.
+    var _loaded as Boolean = false;
+    var _weekly as Array = DEFAULT_WEEKLY_HOLIDAYS;
+    var _extra  as Array = [];
+    var _hist   as Array = [];
+
     function initialize() {
+    }
+
+    function ensureLoaded() as Void {
+        if (_loaded) {
+            return;
+        }
+        _loaded = true;
+        var cached = Storage.getValue(DATA_KEY) as Dictionary?;
+        if (cached != null) {
+            _weekly = cached.get("weekly") as Array;
+            _extra  = cached.get("extra") as Array;
+            _hist   = cached.get("hist") as Array;
+        }
     }
 
     // Safe to call every app launch - no-ops unless >24h passed since the
@@ -65,11 +88,11 @@ class Holidays {
                 histTrimmed.add([h.get("mIdx"), h.get("day"), days != null ? days : 1, h.get("name")]);
             }
         }
-        Storage.setValue(DATA_KEY, {
-            "weekly" => data.get("defaultHolidays"),
-            "extra"  => data.get("historicalExtraHolidays"),
-            "hist"   => histTrimmed,
-        });
+        _weekly = data.get("defaultHolidays") as Array;
+        _extra  = data.get("historicalExtraHolidays") as Array;
+        _hist   = histTrimmed;
+        _loaded = true;
+        Storage.setValue(DATA_KEY, { "weekly" => _weekly, "extra" => _extra, "hist" => _hist });
         WatchUi.requestUpdate();
     }
 
@@ -80,19 +103,17 @@ class Holidays {
         if (monthIdx == -1) {
             return false;
         }
-        var cached = Storage.getValue(DATA_KEY) as Dictionary?;
-        var weekly = (cached != null) ? cached.get("weekly") as Array : DEFAULT_WEEKLY_HOLIDAYS;
-        return contains(weekly, ((day - 1) % 12) + 1);
+        ensureLoaded();
+        return contains(_weekly, ((day - 1) % 12) + 1);
     }
 
     // A named/historical holiday (or a historical extra-day). monthIdx: 0-14
     // for a regular tetra month, -1 for the year-end extra/bonus-day block
     // (in which case `day` is the 0-based extra-day index).
     function isNamedHoliday(monthIdx as Number, day as Number) as Boolean {
+        ensureLoaded();
         if (monthIdx == -1) {
-            var cached = Storage.getValue(DATA_KEY) as Dictionary?;
-            var extra  = (cached != null) ? cached.get("extra") as Array : [];
-            return contains(extra, day);
+            return contains(_extra, day);
         }
         return findHistEntry(monthIdx, day) != null;
     }
@@ -131,10 +152,9 @@ class Holidays {
     }
 
     function findHistEntry(monthIdx as Number, day as Number) as Array? {
-        var cached = Storage.getValue(DATA_KEY) as Dictionary?;
-        var hist = (cached != null) ? cached.get("hist") as Array : [];
-        for (var i = 0; i < hist.size(); i++) {
-            var entry = hist[i] as Array;
+        ensureLoaded();
+        for (var i = 0; i < _hist.size(); i++) {
+            var entry = _hist[i] as Array;
             var span = entry[2] as Number;
             if (entry[0] == monthIdx && day >= (entry[1] as Number) && day < (entry[1] as Number) + span) {
                 return entry;
