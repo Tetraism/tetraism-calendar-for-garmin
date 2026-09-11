@@ -37,8 +37,8 @@ class tetraism_calendarDelegate extends WatchUi.BehaviorDelegate {
 }
 
 // Delegate for the pushed, "entered" view: paging (buttons, or swipe on
-// touch-only watches) navigates months; select toggles Tetra/Gregorian; back
-// pops back out to the widget's initial screen.
+// touch-only watches) navigates months; tap/select shows a holiday if there
+// is one, otherwise toggles Tetra/Gregorian; back pops back out.
 class tetraism_calendarScrollDelegate extends WatchUi.BehaviorDelegate {
 
     var _view as tetraism_calendarView;
@@ -48,17 +48,19 @@ class tetraism_calendarScrollDelegate extends WatchUi.BehaviorDelegate {
         _view = view;
     }
 
-    // Physical select (or a touch tap the platform delivers as a plain
-    // select instead of onTap below - happens on some devices): no
-    // coordinates to hit-test, so it checks *today* specifically. Priority
-    // is always "show the holiday first" - toggling is only the fallback
-    // when there's nothing to show.
-    function onSelect() as Boolean {
-        return showHolidayOr(_view.todayHolidayInfo());
+    // No onSelect() override on purpose: BehaviorDelegate turns a touch tap
+    // into onSelect() first and only calls onTap() if that returns false, so
+    // overriding it would swallow the tap's coordinates. The physical
+    // select button instead falls through to onKey(KEY_ENTER) below.
+    function onKey(keyEvent as WatchUi.KeyEvent) as Boolean {
+        if (keyEvent.getKey() == WatchUi.KEY_ENTER) {
+            return showHolidayOr(_view.todayHolidayInfo());
+        }
+        return false;
     }
 
-    // Touch tap with coordinates: if it landed on a holiday/day-off cell,
-    // show what it is; otherwise fall back exactly like onSelect.
+    // Touch tap: if it landed on a holiday/day-off cell, show what it is;
+    // otherwise toggle Tetra/Gregorian.
     function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
         var coords = clickEvent.getCoordinates();
         return showHolidayOr(_view.holidayInfoAt(coords[0], coords[1]));

@@ -17,8 +17,10 @@ import Toybox.WatchUi;
 class Holidays {
 
     const URL = "https://raw.githubusercontent.com/Tetraism/calendar/refs/heads/main/logic.json";
-    const DATA_KEY = "holidayData";
-    const LAST_CHECK_KEY = "holidayLastCheck";
+    // Bump the suffix whenever the cached shape changes, so a stale cache in
+    // the old shape is ignored and a fresh sync happens right away.
+    const DATA_KEY = "holidayData2";
+    const LAST_CHECK_KEY = "holidayLastCheck2";
     const ONE_DAY_SEC = 86400;
 
     // logic.json's "defaultHolidays": the day-of-week (1-12) within each
@@ -98,7 +100,11 @@ class Holidays {
             return null;
         }
         var entry = findHistEntry(monthIdx, day);
-        return (entry != null) ? entry[3] as String : null;
+        if (entry == null || entry.size() < 4) {
+            return null;
+        }
+        var name = entry[3];
+        return (name instanceof String) ? name : null;
     }
 
     // Human-readable label for a cell, or null if it's a plain day. Shared by
