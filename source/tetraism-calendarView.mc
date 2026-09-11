@@ -24,6 +24,11 @@ class tetraism_calendarView extends WatchUi.View {
     var _tYear as Number?;
     var _tMonth as Number?;   // -1 = the block of extra/bonus days
 
+    // Tap hit-testing for the cells drawn in the most recent onUpdate(): each
+    // entry is [x0, y0, x1, y1, monthIdx, day]. Rebuilt every draw so it
+    // always matches what's currently on screen (see holidayInfoAt()).
+    var _hitRegions as Array = [];
+
     function initialize() {
         View.initialize();
         _showGregorian = TetraCalendar.useGregorianDefault();
@@ -123,6 +128,48 @@ class tetraism_calendarView extends WatchUi.View {
         WatchUi.requestUpdate();
     }
 
+    // Named holidays (e.g. historical figures' days) and weekly days-off
+    // (e.g. weekends) are both "not a plain day", and shown as a filled cell
+    // rather than just colored text so they actually stand out on a tiny
+    // screen: [fillColor or null, textColor]. null fill means "draw the
+    // normal outlined cell" (see the callers).
+    function cellStyle(monthIdx as Number, day as Number) as Array {
+        if (getHolidays().isNamedHoliday(monthIdx, day)) {
+            return [Graphics.COLOR_DK_RED, Graphics.COLOR_WHITE];
+        }
+        if (getHolidays().isWeeklyOff(monthIdx, day)) {
+            return [Graphics.COLOR_ORANGE, Graphics.COLOR_BLACK];
+        }
+        return [null, Graphics.COLOR_LT_GRAY];
+    }
+
+    // Tap-to-inspect: returns the holiday/day-off name for whichever cell
+    // was last drawn at (px, py), or null if that point isn't a holiday cell
+    // (including "not over any cell at all").
+    function holidayInfoAt(px as Number, py as Number) as String? {
+        for (var i = 0; i < _hitRegions.size(); i++) {
+            var r = _hitRegions[i] as Array;
+            if (px < (r[0] as Number) || px >= (r[2] as Number) ||
+                py < (r[1] as Number) || py >= (r[3] as Number)) {
+                continue;
+            }
+            var monthIdx = r[4] as Number;
+            var day      = r[5] as Number;
+            if (monthIdx == -1) {
+                return getHolidays().isNamedHoliday(-1, day) ? TetraCalendar.EXTRA_NAMES[day] : null;
+            }
+            if (getHolidays().isNamedHoliday(monthIdx, day)) {
+                var name = getHolidays().holidayName(monthIdx, day);
+                return (name != null) ? name : "Holiday";
+            }
+            if (getHolidays().isWeeklyOff(monthIdx, day)) {
+                return "Day off";
+            }
+            return null;
+        }
+        return null;
+    }
+
     function daysInMonthGreg(m as Number, y as Number) as Number {
         var days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
         if (m == 2 && TetraCalendar.isLeapGreg(y)) {
@@ -141,6 +188,8 @@ class tetraism_calendarView extends WatchUi.View {
 
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
         dc.clear();
+
+        _hitRegions = [];
 
         if (_showGregorian) {
             // Regular calendar mode.
@@ -197,8 +246,8 @@ class tetraism_calendarView extends WatchUi.View {
         var week1Y = (height * 0.40).toNumber();
         var week2Y = week1Y + 2 * cellH + weekGap;
 
-        drawTetraWeek(dc, startX, week1Y, cellW, cellH, 1, highlightDay);
-        drawTetraWeek(dc, startX, week2Y, cellW, cellH, 13, highlightDay);
+        drawTetraWeek(dc, startX, week1Y, cellW, cellH, 1, highlightDay, monthIdx);
+        drawTetraWeek(dc, startX, week2Y, cellW, cellH, 13, highlightDay, monthIdx);
     }
 
     // Draws the list of year-end bonus days (5, or 6 in a leap year) for the
@@ -216,11 +265,20 @@ class tetraism_calendarView extends WatchUi.View {
         var rowH = (height * 0.09).toNumber();
         var startY = (height * 0.40).toNumber();
 
+        var rowX0 = (width * 0.20).toNumber();
+        var rowX1 = rowX0 + (width * 0.60).toNumber();
+
         for (var i = 0; i < count; i++) {
             var y = startY + i * rowH;
+            _hitRegions.add([rowX0, y, rowX1, y + rowH - 2, -1, i]);
+
             if (i == highlightIdx) {
                 dc.setColor(Graphics.COLOR_DK_GREEN, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle((width * 0.20).toNumber(), y, (width * 0.60).toNumber(), rowH - 2);
+                dc.fillRectangle(rowX0, y, rowX1 - rowX0, rowH - 2);
+                dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+            } else if (getHolidays().isNamedHoliday(-1, i)) {
+                dc.setColor(Graphics.COLOR_DK_RED, Graphics.COLOR_TRANSPARENT);
+                dc.fillRectangle(rowX0, y, rowX1 - rowX0, rowH - 2);
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             } else {
                 dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
@@ -233,7 +291,7 @@ class tetraism_calendarView extends WatchUi.View {
     // Draws one 12-day week as 2 rows of 6, starting at day number `firstDay`
     // (1 or 13), with a small "W1"/"W2" label to the left of the block.
     function drawTetraWeek(dc as Dc, startX as Number, y as Number, cellW as Number, cellH as Number,
-                            firstDay as Number, today as Number) as Void {
+                            firstDay as Number, today as Number, monthIdx as Number) as Void {
         dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(startX - cellW / 2, y + cellH, Graphics.FONT_XTINY,
                     "W" + ((firstDay - 1) / 12 + 1).toString(),
@@ -245,15 +303,22 @@ class tetraism_calendarView extends WatchUi.View {
             var x = startX + col * cellW;
             var cy2 = y + row * cellH;
             var dNum = firstDay + i;
+            _hitRegions.add([x, cy2, x + cellW, cy2 + cellH, monthIdx, dNum]);
 
             if (dNum == today) {
                 dc.setColor(Graphics.COLOR_DK_GREEN, Graphics.COLOR_TRANSPARENT);
                 dc.fillRectangle(x + 1, cy2 + 1, cellW - 2, cellH - 2);
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             } else {
-                dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-                dc.drawRectangle(x + 1, cy2 + 1, cellW - 2, cellH - 2);
-                dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+                var style = cellStyle(monthIdx, dNum);
+                if (style[0] != null) {
+                    dc.setColor(style[0] as Number, Graphics.COLOR_TRANSPARENT);
+                    dc.fillRectangle(x + 1, cy2 + 1, cellW - 2, cellH - 2);
+                } else {
+                    dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+                    dc.drawRectangle(x + 1, cy2 + 1, cellW - 2, cellH - 2);
+                }
+                dc.setColor(style[1] as Number, Graphics.COLOR_TRANSPARENT);
             }
             dc.drawText(x + cellW / 2, cy2 + cellH / 2, Graphics.FONT_XTINY, dNum.toString(),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
@@ -310,12 +375,20 @@ class tetraism_calendarView extends WatchUi.View {
             var x = startX + col * cellW;
             var y = startY + row * cellH;
 
+            var tetra = TetraCalendar.tetraFromGregorian(d, month, year);
+            _hitRegions.add([x, y, x + cellW, y + cellH, tetra[1], tetra[0]]);
+
             if (isCurrentMonth && d == today) {
                 dc.setColor(Graphics.COLOR_DK_GREEN, Graphics.COLOR_TRANSPARENT);
                 dc.fillRectangle(x + 1, y + 1, cellW - 2, cellH - 2);
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             } else {
-                dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+                var style = cellStyle(tetra[1], tetra[0]);
+                if (style[0] != null) {
+                    dc.setColor(style[0] as Number, Graphics.COLOR_TRANSPARENT);
+                    dc.fillRectangle(x + 1, y + 1, cellW - 2, cellH - 2);
+                }
+                dc.setColor(style[1] as Number, Graphics.COLOR_TRANSPARENT);
             }
             dc.drawText(x + cellW / 2, y + cellH / 2, Graphics.FONT_XTINY, d.toString(),
                         Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);

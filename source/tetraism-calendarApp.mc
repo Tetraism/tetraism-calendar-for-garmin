@@ -9,6 +9,7 @@ class tetraism_calendarApp extends Application.AppBase {
     }
 
     function onStart(state as Dictionary?) as Void {
+        getHolidays().checkForUpdate();
     }
 
     function onStop(state as Dictionary?) as Void {

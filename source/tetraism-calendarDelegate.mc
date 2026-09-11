@@ -1,6 +1,14 @@
 import Toybox.WatchUi;
 import Toybox.Lang;
 
+// Delegate for the widget's initial view. Garmin restricts touch input on a
+// widget's *initial* view to select/tap only - swipe never reaches it on
+// touch-only watches like the vivoactive 4s (confirmed by Garmin staff:
+// https://forums.garmin.com/developer/connect-iq/f/discussion/258395/behaviordelegate-and-vivoactive4).
+// That's why a swipe there falls through to the OS and swipes to the next
+// widget instead. Fix: a tap here "enters" the widget by pushing the exact
+// same view again with a second delegate - since that pushed view isn't the
+// *initial* one, it receives full swipe/page input instead.
 class tetraism_calendarDelegate extends WatchUi.BehaviorDelegate {
 
     var _view as tetraism_calendarView;
@@ -10,23 +18,69 @@ class tetraism_calendarDelegate extends WatchUi.BehaviorDelegate {
         _view = view;
     }
 
-    // Covers both a screen tap and the physical Start/Enter button.
     function onSelect() as Boolean {
-        _view.toggleCalendar();
+        WatchUi.pushView(_view, new tetraism_calendarScrollDelegate(_view), WatchUi.SLIDE_IMMEDIATE);
         return true;
     }
 
-    // BehaviorDelegate maps this to the physical UP button *and* to an
-    // upward swipe on touchscreens — including touch-only watches that
-    // have no UP/DOWN buttons at all. No extra swipe code needed.
+    // Physical UP/DOWN buttons still reach the initial view on button
+    // watches, so paging works there even before "entering".
     function onPreviousPage() as Boolean {
         _view.previousMonth();
         return true;
     }
 
-    // Same mapping as above, but for DOWN / a downward swipe.
     function onNextPage() as Boolean {
         _view.nextMonth();
+        return true;
+    }
+}
+
+// Delegate for the pushed, "entered" view: paging (buttons, or swipe on
+// touch-only watches) navigates months; select toggles Tetra/Gregorian; back
+// pops back out to the widget's initial screen.
+class tetraism_calendarScrollDelegate extends WatchUi.BehaviorDelegate {
+
+    var _view as tetraism_calendarView;
+
+    function initialize(view as tetraism_calendarView) {
+        BehaviorDelegate.initialize();
+        _view = view;
+    }
+
+    // Physical select still just toggles the calendar - only a touchscreen
+    // tap (below) can target a specific cell.
+    function onSelect() as Boolean {
+        _view.toggleCalendar();
+        return true;
+    }
+
+    // Touch tap: if it landed on a holiday/day-off cell, show what it is;
+    // otherwise treat it like a plain select (toggle Tetra/Gregorian).
+    function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
+        var coords = clickEvent.getCoordinates();
+        var info = _view.holidayInfoAt(coords[0], coords[1]);
+        if (info != null) {
+            WatchUi.pushView(new tetraism_calendarHolidayInfoView(info),
+                              new tetraism_calendarHolidayInfoDelegate(), WatchUi.SLIDE_UP);
+            return true;
+        }
+        _view.toggleCalendar();
+        return true;
+    }
+
+    function onPreviousPage() as Boolean {
+        _view.previousMonth();
+        return true;
+    }
+
+    function onNextPage() as Boolean {
+        _view.nextMonth();
+        return true;
+    }
+
+    function onBack() as Boolean {
+        WatchUi.popView(WatchUi.SLIDE_IMMEDIATE);
         return true;
     }
 }

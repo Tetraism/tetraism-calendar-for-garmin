@@ -59,8 +59,15 @@ module TetraCalendar {
     // Returns [dayOfMonth 1-24, monthIndex 0-14, tetraYear] for regular days,
     // or [extraIndex 0-4 (0-5 in a leap year), -1, tetraYear] for the bonus days.
     function getDate() as Array {
-        var info     = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
-        var todayAbs = getAbsoluteDays(info.day, info.month, info.year);
+        var info = Gregorian.info(Time.now(), Time.FORMAT_SHORT);
+        return tetraFromGregorian(info.day, info.month, info.year);
+    }
+
+    // Same as getDate(), but for an arbitrary Gregorian date instead of
+    // "now" — used to check whether a given cell in the Gregorian grid is a
+    // tetra holiday.
+    function tetraFromGregorian(d as Number, m as Number, y as Number) as Array {
+        var todayAbs = getAbsoluteDays(d, m, y);
         var syncAbs  = getAbsoluteDays(EPOCH_G_DAY, EPOCH_G_MONTH, EPOCH_G_YEAR);
 
         var remainingDays = todayAbs - syncAbs;

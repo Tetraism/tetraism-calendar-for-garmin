@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <iq:manifest version="3" xmlns:iq="http://www.garmin.com/xml/connectiq">
-    <iq:application id="0b00a452-1b5a-4137-91bf-20bbf4bc873c" type="widget" name="@Strings.AppName" entry="tetraism_calendarApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="1.2.0">
+    <iq:application id="0b00a452-1b5a-4137-91bf-20bbf4bc873c" type="widget" name="@Strings.AppName" entry="tetraism_calendarApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="2.4.0">
         <!--
             type="watch-app" (not "widget"): several current watches (FR265/255/170/165,
             FR970/965/955, fenix 7/8, epix 2, venu 2/3, vivoactive 5/6...) replaced the old
@@ -9,8 +9,11 @@
             e.g. "watch-app" on devices that lack it, such as edge130/fr45/garminswim2).
             "watch-app" is the type that installs on every one of these, old and new alike.
 
-            minApiLevel="1.2.0": verified with a real build against the oldest
-            watch-app-capable device (epix, API level 1.2); no feature here needs more.
+            minApiLevel="2.4.0": bumped from 1.2.0 for Toybox.Application.Storage
+            (holiday cache) and Toybox.Communications (holiday sync), both of which
+            need it. Some of the oldest devices in the product list below may no
+            longer build under the SDK once holiday-sync code is compiled in; if the
+            build rejects any of them, drop those entries.
 
             Product list: every device in the installed Connect IQ SDK that supports the
             watch-app type, each verified to actually build (source of truth: this SDK's own
@@ -27,8 +30,6 @@
             <iq:product id="approachs7047mm"/>
             <iq:product id="d2air"/>
             <iq:product id="d2airx10"/>
-            <iq:product id="d2bravo"/>
-            <iq:product id="d2bravo_titanium"/>
             <iq:product id="d2charlie"/>
             <iq:product id="d2delta"/>
             <iq:product id="d2deltapx"/>
@@ -63,14 +64,11 @@
             <iq:product id="edgemtb"/>
             <iq:product id="enduro"/>
             <iq:product id="enduro3"/>
-            <iq:product id="epix"/>
             <iq:product id="epix2"/>
             <iq:product id="epix2pro42mm"/>
             <iq:product id="epix2pro47mm"/>
             <iq:product id="epix2pro51mm"/>
             <iq:product id="etrextouch"/>
-            <iq:product id="fenix3"/>
-            <iq:product id="fenix3_hr"/>
             <iq:product id="fenix5"/>
             <iq:product id="fenix5plus"/>
             <iq:product id="fenix5s"/>
@@ -108,8 +106,6 @@
             <iq:product id="fr165m"/>
             <iq:product id="fr170"/>
             <iq:product id="fr170m"/>
-            <iq:product id="fr230"/>
-            <iq:product id="fr235"/>
             <iq:product id="fr245"/>
             <iq:product id="fr245m"/>
             <iq:product id="fr255"/>
@@ -121,13 +117,11 @@
             <iq:product id="fr55"/>
             <iq:product id="fr57042mm"/>
             <iq:product id="fr57047mm"/>
-            <iq:product id="fr630"/>
             <iq:product id="fr645"/>
             <iq:product id="fr645m"/>
             <iq:product id="fr70"/>
             <iq:product id="fr735xt"/>
             <iq:product id="fr745"/>
-            <iq:product id="fr920xt"/>
             <iq:product id="fr935"/>
             <iq:product id="fr945"/>
             <iq:product id="fr945lte"/>
@@ -179,7 +173,6 @@
             <iq:product id="venusq2m"/>
             <iq:product id="venusqm"/>
             <iq:product id="venux1"/>
-            <iq:product id="vivoactive"/>
             <iq:product id="vivoactive3"/>
             <iq:product id="vivoactive3d"/>
             <iq:product id="vivoactive3m"/>
@@ -190,7 +183,9 @@
             <iq:product id="vivoactive6"/>
             <iq:product id="vivoactive_hr"/>
         </iq:products>
-        <iq:permissions/>
+        <iq:permissions>
+            <iq:uses-permission id="Communications"/>
+        </iq:permissions>
         <iq:languages/>
         <iq:barrels/>
     </iq:application>
