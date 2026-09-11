@@ -1,6 +1,7 @@
 import Toybox.Communications;
 import Toybox.Application.Storage;
 import Toybox.Lang;
+import Toybox.System;
 import Toybox.Time;
 import Toybox.WatchUi;
 
@@ -16,7 +17,11 @@ import Toybox.WatchUi;
 // `self` to bind to.
 class Holidays {
 
-    const URL = "https://raw.githubusercontent.com/Tetraism/calendar/refs/heads/main/logic.json";
+    // Same file as raw.githubusercontent.com/Tetraism/calendar/main/logic.json,
+    // but via jsDelivr: GitHub raw serves it as text/plain, which the phone's
+    // Garmin Connect app rejects for a JSON request (-400) — the simulator
+    // doesn't, which is why it only broke on the real watch.
+    const URL = "https://cdn.jsdelivr.net/gh/Tetraism/calendar@main/logic.json";
     // Bump the suffix whenever the cached shape changes, so a stale cache in
     // the old shape is ignored and a fresh sync happens right away.
     const DATA_KEY = "holidayData2";
@@ -32,15 +37,13 @@ class Holidays {
     }
 
     // Safe to call every app launch - no-ops unless >24h passed since the
-    // last check (successful or not; a failed/offline attempt still marks
-    // "checked" so it retries tomorrow, not on every single launch).
+    // last *successful* sync. A failed/offline attempt doesn't count, so the
+    // next launch simply tries again.
     function checkForUpdate() as Void {
         var lastCheck = Storage.getValue(LAST_CHECK_KEY);
-        var now = Time.now().value();
-        if (lastCheck != null && (now - (lastCheck as Number)) < ONE_DAY_SEC) {
+        if (lastCheck != null && (Time.now().value() - (lastCheck as Number)) < ONE_DAY_SEC) {
             return;
         }
-        Storage.setValue(LAST_CHECK_KEY, now);
         Communications.makeWebRequest(URL, null,
             { :method => Communications.HTTP_REQUEST_METHOD_GET,
               :responseType => Communications.HTTP_RESPONSE_CONTENT_TYPE_JSON },
@@ -48,9 +51,11 @@ class Holidays {
     }
 
     function onReceive(responseCode as Number, data as Dictionary?) as Void {
+        System.println("holiday sync: " + responseCode);
         if (responseCode != 200 || data == null) {
             return;
         }
+        Storage.setValue(LAST_CHECK_KEY, Time.now().value());
         var hist = data.get("historicalHolidays") as Array?;
         var histTrimmed = [];
         if (hist != null) {
