@@ -28,9 +28,10 @@ class tetraism_calendarGlanceView extends WatchUi.GlanceView {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
 
         if (TetraCalendar.useGregorianDefault()) {
-            var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
-            var line = Lang.format("$1$ $2$, $3$", [info.month, info.day, info.year]);
-            dc.drawText(0, textY, Graphics.FONT_GLANCE, line,
+            var info  = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
+            var line  = Lang.format("$1$ $2$, $3$", [info.month, info.day, info.year]);
+            var tetra = TetraCalendar.tetraFromGregorian(info.day, info.month, info.year);
+            dc.drawText(0, textY, Graphics.FONT_GLANCE, line + holidaySuffix(tetra[1], tetra[0]),
                         Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             return;
         }
@@ -52,7 +53,14 @@ class tetraism_calendarGlanceView extends WatchUi.GlanceView {
             timeInfo[0], timeInfo[1].format("%02d")
         ]);
 
-        dc.drawText(0, textY, Graphics.FONT_GLANCE, dateStr + "  " + timeStr,
+        dc.drawText(0, textY, Graphics.FONT_GLANCE,
+                    dateStr + "  " + timeStr + holidaySuffix(monthIdx, day),
                     Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    // "  - <name>" when today is a holiday/day-off, else "".
+    function holidaySuffix(monthIdx as Number, day as Number) as String {
+        var info = getHolidays().describe(monthIdx, day);
+        return (info != null) ? ("  - " + info) : "";
     }
 }

@@ -48,24 +48,29 @@ class tetraism_calendarScrollDelegate extends WatchUi.BehaviorDelegate {
         _view = view;
     }
 
-    // Physical select still just toggles the calendar - only a touchscreen
-    // tap (below) can target a specific cell.
+    // Physical select (or a touch tap the platform delivers as a plain
+    // select instead of onTap below - happens on some devices): no
+    // coordinates to hit-test, so it checks *today* specifically. Priority
+    // is always "show the holiday first" - toggling is only the fallback
+    // when there's nothing to show.
     function onSelect() as Boolean {
-        _view.toggleCalendar();
-        return true;
+        return showHolidayOr(_view.todayHolidayInfo());
     }
 
-    // Touch tap: if it landed on a holiday/day-off cell, show what it is;
-    // otherwise treat it like a plain select (toggle Tetra/Gregorian).
+    // Touch tap with coordinates: if it landed on a holiday/day-off cell,
+    // show what it is; otherwise fall back exactly like onSelect.
     function onTap(clickEvent as WatchUi.ClickEvent) as Boolean {
         var coords = clickEvent.getCoordinates();
-        var info = _view.holidayInfoAt(coords[0], coords[1]);
+        return showHolidayOr(_view.holidayInfoAt(coords[0], coords[1]));
+    }
+
+    function showHolidayOr(info as String?) as Boolean {
         if (info != null) {
             WatchUi.pushView(new tetraism_calendarHolidayInfoView(info),
                               new tetraism_calendarHolidayInfoDelegate(), WatchUi.SLIDE_UP);
-            return true;
+        } else {
+            _view.toggleCalendar();
         }
-        _view.toggleCalendar();
         return true;
     }
 

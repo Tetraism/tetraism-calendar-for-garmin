@@ -101,6 +101,24 @@ class Holidays {
         return (entry != null) ? entry[3] as String : null;
     }
 
+    // Human-readable label for a cell, or null if it's a plain day. Shared by
+    // the view (tap-to-inspect, and physical-select on "today") and the
+    // glance (today's summary line), so "what counts as a holiday" and "what
+    // to call it" live in exactly one place.
+    function describe(monthIdx as Number, day as Number) as String? {
+        if (monthIdx == -1) {
+            return isNamedHoliday(-1, day) ? TetraCalendar.EXTRA_NAMES[day] : null;
+        }
+        if (isNamedHoliday(monthIdx, day)) {
+            var name = holidayName(monthIdx, day);
+            return (name != null) ? name : "Holiday";
+        }
+        if (isWeeklyOff(monthIdx, day)) {
+            return "Day off";
+        }
+        return null;
+    }
+
     function findHistEntry(monthIdx as Number, day as Number) as Array? {
         var cached = Storage.getValue(DATA_KEY) as Dictionary?;
         var hist = (cached != null) ? cached.get("hist") as Array : [];

@@ -153,21 +153,17 @@ class tetraism_calendarView extends WatchUi.View {
                 py < (r[1] as Number) || py >= (r[3] as Number)) {
                 continue;
             }
-            var monthIdx = r[4] as Number;
-            var day      = r[5] as Number;
-            if (monthIdx == -1) {
-                return getHolidays().isNamedHoliday(-1, day) ? TetraCalendar.EXTRA_NAMES[day] : null;
-            }
-            if (getHolidays().isNamedHoliday(monthIdx, day)) {
-                var name = getHolidays().holidayName(monthIdx, day);
-                return (name != null) ? name : "Holiday";
-            }
-            if (getHolidays().isWeeklyOff(monthIdx, day)) {
-                return "Day off";
-            }
-            return null;
+            return getHolidays().describe(r[4] as Number, r[5] as Number);
         }
         return null;
+    }
+
+    // Same lookup, but for *today* regardless of what's on screen or where -
+    // used by physical-select, which (unlike a touch tap) carries no
+    // coordinates to hit-test against.
+    function todayHolidayInfo() as String? {
+        var actual = TetraCalendar.getDate();
+        return getHolidays().describe(actual[1], actual[0]);
     }
 
     function daysInMonthGreg(m as Number, y as Number) as Number {
