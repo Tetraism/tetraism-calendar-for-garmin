@@ -133,14 +133,26 @@ class tetraism_calendarView extends WatchUi.View {
     // rather than just colored text so they actually stand out on a tiny
     // screen: [fillColor or null, textColor]. null fill means "draw the
     // normal outlined cell" (see the callers).
-    function cellStyle(monthIdx as Number, day as Number) as Array {
-        if (getHolidays().isNamedHoliday(monthIdx, day)) {
-            return [Graphics.COLOR_YELLOW, Graphics.COLOR_BLACK];
+    function cellStyle(monthIdx as Number, day as Number, showNamedHolidays as Boolean) as Array {
+        if (showNamedHolidays && getHolidays().isNamedHoliday(monthIdx, day)) {
+            var holidayColor = Properties.getValue("HolidayColor") as Number;
+            return [holidayColor, textColorFor(holidayColor)];
         }
         if (getHolidays().isWeeklyOff(monthIdx, day)) {
-            return [Graphics.COLOR_DK_RED, Graphics.COLOR_WHITE];
+            var dayOffColor = Properties.getValue("DayOffColor") as Number;
+            return [dayOffColor, textColorFor(dayOffColor)];
         }
         return [null, Graphics.COLOR_LT_GRAY];
+    }
+
+    // Picks a readable text color (black or white) for a fill color chosen
+    // via settings, since the preset list spans both light and dark colors.
+    function textColorFor(color as Number) as Number {
+        var r = (color >> 16) & 0xFF;
+        var g = (color >> 8) & 0xFF;
+        var b = color & 0xFF;
+        var luma = r * 0.299 + g * 0.587 + b * 0.114;
+        return luma > 140 ? Graphics.COLOR_BLACK : Graphics.COLOR_WHITE;
     }
 
     // Tap-to-inspect: returns the holiday/day-off name for whichever cell
@@ -306,7 +318,7 @@ class tetraism_calendarView extends WatchUi.View {
                 dc.fillRectangle(x + 1, cy2 + 1, cellW - 2, cellH - 2);
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             } else {
-                var style = cellStyle(monthIdx, dNum);
+                var style = cellStyle(monthIdx, dNum, true);
                 if (style[0] != null) {
                     dc.setColor(style[0] as Number, Graphics.COLOR_TRANSPARENT);
                     dc.fillRectangle(x + 1, cy2 + 1, cellW - 2, cellH - 2);
@@ -379,7 +391,8 @@ class tetraism_calendarView extends WatchUi.View {
                 dc.fillRectangle(x + 1, y + 1, cellW - 2, cellH - 2);
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
             } else {
-                var style = cellStyle(tetra[1], tetra[0]);
+                var showNamedHolidays = !(Properties.getValue("HideHolidaysInGregorian") as Boolean);
+                var style = cellStyle(tetra[1], tetra[0], showNamedHolidays);
                 if (style[0] != null) {
                     dc.setColor(style[0] as Number, Graphics.COLOR_TRANSPARENT);
                     dc.fillRectangle(x + 1, y + 1, cellW - 2, cellH - 2);

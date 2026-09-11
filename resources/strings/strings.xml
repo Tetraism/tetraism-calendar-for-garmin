@@ -2,4 +2,15 @@
     <string id="AppName">tetraism-calendar</string>
     <string id="AllowGregorianViewTitle">Allow switching to Gregorian calendar (tap/Start)</string>
     <string id="DefaultGregorianTitle">Default to Gregorian calendar on launch</string>
+    <string id="HolidayColorTitle">Holiday color</string>
+    <string id="DayOffColorTitle">Regular day-off color</string>
+    <string id="HideHolidaysInGregorianTitle">Hide Tetraist holidays in Gregorian view</string>
+    <string id="ColorYellow">Yellow</string>
+    <string id="ColorOrange">Orange</string>
+    <string id="ColorDkRed">Dark Red</string>
+    <string id="ColorRed">Red</string>
+    <string id="ColorDkGreen">Dark Green</string>
+    <string id="ColorBlue">Blue</string>
+    <string id="ColorPurple">Purple</string>
+    <string id="ColorWhite">White</string>
 </strings>
